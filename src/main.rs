@@ -1,17 +1,15 @@
-use std::{io, sync::Arc, thread, time::Duration};
+use std::{io, sync::Arc, time::Duration};
 mod layout;
-use bluetooth::{scan_devices, BluetoothService};
+use bluetooth::{controller_info, scan_devices};
 use data::global_state::{GLOBAL_STATE, UPDATE_UI};
 use layout::main_layout;
 use ratatui::{
-    crossterm::{
-        event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
-        terminal::enable_raw_mode,
-    },
-    widgets::Block,
+    crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
+    widgets::{Block, Widget},
     DefaultTerminal, Frame,
 };
 use tokio::time;
+use widgets::{current_status::CurrentStatusWidget, scanned_devices::DevicesList};
 
 mod bluetooth;
 mod data;
@@ -20,11 +18,12 @@ mod widgets;
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
     tokio::spawn(async move { scan_devices().await });
-    enable_raw_mode()?;
-    let mut terminal = ratatui::init();
-    let app_result = Bluetui::default().run(&mut terminal).await;
-    ratatui::restore();
-    app_result
+    controller_info().await;
+    Ok(())
+    // let mut terminal = ratatui::init();
+    // let app_result = Bluetui::default().run(&mut terminal).await;
+    // ratatui::restore();
+    // app_result
 }
 
 #[derive(Debug, Default)]
@@ -64,8 +63,8 @@ impl Bluetui {
         let layout = main_layout(area);
         let xd = Block::bordered().title_top(scanned.len().to_string());
         let dx = Block::bordered();
-        frame.render_widget(xd, layout[0]);
-        frame.render_widget(dx, layout[1]);
+        frame.render_widget(CurrentStatusWidget, layout[0]);
+        frame.render_widget(DevicesList, layout[1]);
     }
 
     fn exit(&mut self) {
@@ -83,7 +82,6 @@ impl Bluetui {
     }
 
     async fn handle_events(&mut self) -> io::Result<()> {
-        // Check if there are any key events available without blocking
         if event::poll(Duration::from_millis(10))? {
             if let Event::Key(key_event) = event::read()? {
                 if key_event.kind == KeyEventKind::Press {

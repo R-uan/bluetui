@@ -1,10 +1,11 @@
 use core::str;
 use std::{
+    io::Read,
     process::{self, Stdio},
     sync::Arc,
 };
 use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     sync::mpsc,
 };
 
@@ -79,7 +80,7 @@ pub async fn scan_devices() {
 
     {
         let mut state = global.write().unwrap();
-        state.scanning = true;
+        state.is_scanning = true;
     }
 
     let mut process = tokio::process::Command::new("bluetoothctl")
@@ -129,4 +130,45 @@ pub async fn scan_devices() {
         }
         // println!("> > > > {line}");
     }
+}
+
+#[derive(Default)]
+pub struct ControllerInfo {
+    pub name: String,
+    pub pairable: bool,
+    pub powered: bool,
+    pub power_state: String,
+}
+
+pub async fn controller_info() {
+    let command = tokio::process::Command::new("bluetoothctl")
+        .arg("show")
+        .stdout(Stdio::piped())
+        .output()
+        .await
+        .unwrap();
+
+    let stdout = str::from_utf8(&command.stdout).unwrap();
+    let ved: Vec<&str> = stdout.split("\n").collect();
+
+    let global = Arc::clone(&GLOBAL_STATE);
+    ved.iter().for_each(|f| {
+        let mut state = global.write().unwrap();
+        if f.contains("Powered") {
+            state.controller_info.powered = match extract_value(f) {
+                "yes" => true,
+                "no" => false,
+                _ => false,
+            };
+        } else if f.contains("PowerState") {
+            state.controller_info.power_state = extract_value(f).to_owned();
+        }
+    });
+
+    // println!("{:#?}", ved);
+}
+
+fn extract_value(string: &str) -> &str {
+    let split: Vec<&str> = string.splitn(2, ":").collect();
+    return split[1];
 }
