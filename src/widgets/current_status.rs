@@ -7,7 +7,7 @@ use ratatui::{
     widgets::{Paragraph, Widget},
 };
 
-use crate::data::global_state::GLOBAL_STATE;
+use crate::data::global_state::{GLOBAL_STATE, UPDATE_UI};
 
 pub struct CurrentStatusWidget;
 
@@ -22,13 +22,14 @@ impl Widget for CurrentStatusWidget {
 
         let global = Arc::clone(&GLOBAL_STATE);
         let state = global.read().unwrap();
+        let ui_state = UPDATE_UI.1.clone();
 
-        let power_status = match state.is_power_on {
+        let power_status = match state.controller_info.powered {
             true => "power on",
             false => "power off",
         };
 
-        let power_style = match state.is_power_on {
+        let power_style = match state.controller_info.powered {
             true => Style::new().fg(Color::LightGreen),
             false => Style::new().fg(Color::LightRed),
         };
@@ -38,7 +39,7 @@ impl Widget for CurrentStatusWidget {
             .style(power_style)
             .render(main[0], buf);
 
-        Paragraph::new("text")
+        Paragraph::new(state.scanned_devices.len().to_string())
             .alignment(Alignment::Center)
             .render(main[1], buf);
 
