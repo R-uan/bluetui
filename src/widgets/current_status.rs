@@ -2,28 +2,27 @@ use std::sync::Arc;
 
 use ratatui::{
     buffer::Buffer,
-    layout::{Alignment, Constraint, Layout, Rect},
+    layout::{Alignment, Constraint, Flex, Layout, Rect},
     style::{Color, Style},
     widgets::{Paragraph, Widget},
 };
 
-use crate::data::global_state::{GLOBAL_STATE, UPDATE_UI};
+use crate::data::global_state::{CONNECTED_DEVICE, GLOBAL_STATE};
 
 pub struct CurrentStatusWidget;
 
-impl Widget for CurrentStatusWidget {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
+impl CurrentStatusWidget {
+    pub fn render(area: Rect, buf: &mut Buffer) {
         let main = Layout::horizontal([
             Constraint::Length(10),
             Constraint::Length(10),
             Constraint::Length(10),
         ])
+        .flex(Flex::SpaceAround)
         .split(area);
 
         let global = Arc::clone(&GLOBAL_STATE);
         let state = global.read().unwrap();
-        let ui_state = UPDATE_UI.1.clone();
-
         let power_status = match state.controller_info.powered {
             true => "power on",
             false => "power off",
@@ -43,7 +42,17 @@ impl Widget for CurrentStatusWidget {
             .alignment(Alignment::Center)
             .render(main[1], buf);
 
-        Paragraph::new("connection")
+        let cl = Arc::clone(&CONNECTED_DEVICE);
+        let binding = cl.read().unwrap();
+        let xdx = binding.as_ref();
+
+        let caralho = if let Some(_) = xdx {
+            "Connected"
+        } else {
+            "None"
+        };
+
+        Paragraph::new(caralho)
             .alignment(Alignment::Center)
             .render(main[2], buf);
     }

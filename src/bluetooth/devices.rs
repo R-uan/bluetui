@@ -46,17 +46,53 @@ pub async fn scan_devices() {
                     let (sen, _) = &*UPDATE_UI;
                     let _ = sen.send(state.scanned_devices.len());
                 }
-            } else if line.contains("CHG") && line.contains("Device") {
-                // let start = line.find("Device").unwrap();
-                // let format = &line[start..line.len()];
+            } else if line.contains("DEL") && line.contains("Device") {
+                let start = line.find("Device").unwrap();
+                let format = &line[start..line.len()];
 
-                // if let Some(device) = Device::new(format) {
-                //     let mut state = global_variable.write().unwrap();
-                //     state.scanned_devices.push(device);
-                //     let (sen, _) = &*UPDATE_UI;
-                //     let _ = sen.send(state.scanned_devices.len());
-                // }
+                if let Some(device) = Device::new(format) {
+                    let mut state = global_variable.write().unwrap();
+                    state
+                        .scanned_devices
+                        .retain(|dev| dev.mac_addr != device.mac_addr);
+                }
+            } else if line.contains("CHG") && line.contains("Device") {
+                let start = line.find("Device").unwrap();
+                let format = &line[start..line.len()];
+
+                let mut state = global_variable.write().unwrap();
+                if let Some(mac) = Device::extract_mac(format) {
+                    if let Some(device) =
+                        state.scanned_devices.iter_mut().find(|d| d.mac_addr == mac)
+                    {
+                        device.update_device_info();
+                    }
+                }
             }
         }
     }
+}
+
+pub async fn known_devices() {
+    let mut run_process = Command::new("bluetoothctl")
+        .arg("devices")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("Bluetoothctl interactive mode wasn't initialized properly (⊙ _ ⊙ )");
+
+    let stdout = run_process
+        .stdout
+        .take()
+        .expect("Could not get output from bluetoothctl 'scan on' command pipeline (⊙ _ ⊙ )");
+
+    let stdout_reader = BufReader::new(stdout);
+
+    let devices: Vec<Device> = stdout_reader
+        .lines()
+        .filter_map(Result::ok)
+        .filter_map(|line| Device::new(&line))
+        .collect();
+
+    GLOBAL_STATE.write().unwrap().scanned_devices = devices;
 }

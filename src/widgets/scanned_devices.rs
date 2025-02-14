@@ -1,28 +1,30 @@
 use std::sync::Arc;
 
-use ratatui::widgets::{Block, List, Widget};
+use ratatui::{
+    buffer::Buffer,
+    layout::Rect,
+    text::{Text, ToText},
+    widgets::{Block, HighlightSpacing, List, ListState, StatefulWidget},
+};
 
 use crate::data::global_state::GLOBAL_STATE;
+#[derive(Debug, Default)]
+pub struct ScannedDevices {
+    pub state: ListState,
+}
 
-pub struct DevicesList;
-
-impl Widget for DevicesList {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
+impl ScannedDevices {
+    pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
         let global = Arc::clone(&GLOBAL_STATE);
         let state = global.read().unwrap();
+        let block = Block::bordered();
 
-        let paired_devices = &state.scanned_devices;
+        let entries: Vec<Text<'_>> = state.scanned_devices.iter().map(|s| s.to_text()).collect();
+        let list = List::new(entries)
+            .highlight_symbol(">")
+            .block(block)
+            .highlight_spacing(HighlightSpacing::WhenSelected);
 
-        let items: Vec<String> = paired_devices
-            .iter()
-            .map(|pd| {
-                let name = &pd.name;
-                let mac_addr = &pd.mac_addr;
-                println!("{name}");
-                format!("{name} {mac_addr}")
-            })
-            .collect();
-
-        List::new(items).highlight_symbol(">").render(area, buf);
+        StatefulWidget::render(list, area, buf, &mut self.state);
     }
 }

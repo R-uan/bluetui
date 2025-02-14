@@ -4,10 +4,14 @@ mod layout;
 mod ui;
 mod widgets;
 
-use bluetooth::{controller::controller_info, devices::scan_devices};
+use bluetooth::{
+    controller::controller_info,
+    devices::{known_devices, scan_devices},
+};
 use ui::bluetui::Bluetui;
 
 async fn initialization() {
+    tokio::spawn(async move { known_devices().await });
     tokio::spawn(async move { controller_info().await });
     tokio::spawn(async move { scan_devices().await });
 }

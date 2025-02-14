@@ -15,6 +15,9 @@ pub struct GlobalState {
 pub static GLOBAL_STATE: LazyLock<Arc<RwLock<GlobalState>>> =
     LazyLock::new(|| Arc::new(RwLock::new(GlobalState::default())));
 
+pub static CONNECTED_DEVICE: LazyLock<Arc<RwLock<Option<Device>>>> =
+    LazyLock::new(|| Arc::new(RwLock::new(None)));
+
 pub static UPDATE_UI: LazyLock<(watch::Sender<usize>, watch::Receiver<usize>)> =
     LazyLock::new(|| {
         let (sen, rec) = watch::channel(0);

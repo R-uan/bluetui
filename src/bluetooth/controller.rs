@@ -45,5 +45,5 @@ pub async fn controller_info() {
 
 pub fn extract_value(string: &str) -> &str {
     let split: Vec<&str> = string.splitn(2, ":").collect();
-    return split[1];
+    return split[1].trim();
 }
