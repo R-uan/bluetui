@@ -1,28 +1,24 @@
-mod bluetooth;
-mod data;
-mod layout;
-mod ui;
-mod widgets;
-
-use bluetooth::{
-    controller::controller_info,
-    devices::{known_devices, scan_devices},
+use std::{
+    thread::{self, sleep},
+    time::Duration,
 };
-use ui::bluetui::Bluetui;
 
-async fn initialization() {
-    tokio::spawn(async move { known_devices().await });
-    tokio::spawn(async move { controller_info().await });
-    tokio::spawn(async move { scan_devices().await });
-}
+use bluetooth::devices::{known_devices, scan_devices};
+use data::global_state::GLOBAL;
 
+mod bluetooth;
+
+mod data;
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
-    tokio::spawn(async move { initialization().await });
+    thread::spawn(move || known_devices());
+    thread::spawn(move || scan_devices());
 
-    let mut terminal = ratatui::init();
-    let app_result = Bluetui::default().run(&mut terminal).await;
-    ratatui::restore();
+    loop {
+        let global = GLOBAL.read().unwrap().devices.len();
+        println!("{}", global);
+        sleep(Duration::from_secs(1));
+    }
 
-    app_result
+    Ok(())
 }

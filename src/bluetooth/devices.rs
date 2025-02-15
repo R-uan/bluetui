@@ -1,112 +1,77 @@
 use std::{
     io::{BufRead, BufReader, Write},
     process::{Command, Stdio},
-    sync::Arc,
 };
+
+use regex::Regex;
 
 use crate::data::{
-    device::Device,
-    global_state::{GLOBAL_STATE, UPDATE_UI},
+    device::{self, Device},
+    global_state::GLOBAL,
 };
 
-pub async fn scan_devices() {
-    let global_variable = Arc::clone(&GLOBAL_STATE);
-    let mut run_process = Command::new("bluetoothctl")
+pub fn scan_devices() {
+    let mut command = Command::new("bluetoothctl")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .expect("Bluetoothctl interactive mode wasn't initialized properly (⊙ _ ⊙ )");
+        .expect("Unable to run bluetoothctl");
 
-    let mut stdin = run_process
-        .stdin
-        .take()
-        .expect("Could not get bluetooth stdin pipeline (⊙ _ ⊙ )");
-
+    let mut stdin = command.stdin.take().expect("Unable to get stdin");
     stdin
         .write_all(b"scan on\n")
-        .expect("Could not send command 'scan on' to bluetoothctl stdin pipeline (⊙ _ ⊙ )");
+        .expect("Unable to write scan on");
 
-    let stdout = run_process
-        .stdout
-        .take()
-        .expect("Could not get output from bluetoothctl 'scan on' command pipeline (⊙ _ ⊙ )");
+    let stdout = command.stdout.take().expect("Unable to get stdout");
+    let line_buffer = BufReader::new(stdout);
 
-    let stdout_reader = BufReader::new(stdout);
-    let stdout_data = stdout_reader.lines();
-
-    for line in stdout_data {
-        if let Ok(line) = line {
-            if line.contains("NEW") && line.contains("Device") == true {
-                let start = line.find("Device").unwrap();
-                let format = &line[start..line.len()];
-
-                if let Some(device) = Device::new(format) {
-                    let state = global_variable.write().unwrap();
-                    state.scanned_devices.write().unwrap().push(device);
-                    let (sen, _) = &*UPDATE_UI;
-                    let _ = sen.send(state.scanned_devices.write().unwrap().len());
-                }
-            } else if line.contains("DEL") && line.contains("Device") {
-                let start = line.find("Device").unwrap();
-                let format = &line[start..line.len()];
-
-                if let Some(device) = Device::new(format) {
-                    let state = global_variable.write().unwrap();
-                    state
-                        .scanned_devices
-                        .write()
-                        .unwrap()
-                        .retain(|dev| dev.mac_addr != device.mac_addr);
-                }
-            } else if line.contains("CHG") && line.contains("Device") {
-                let start = line.find("Device").unwrap();
-                let format = &line[start..line.len()];
-
-                let state = global_variable.write().unwrap();
-                if let Some(mac) = Device::extract_mac(format) {
-                    if let Some(index) = state
-                        .scanned_devices
-                        .write()
-                        .unwrap()
-                        .iter()
-                        .position(|d| d.mac_addr == mac)
-                    {
-                        state.scanned_devices.write().unwrap()[index].update_device_info(index);
-                        let (sen, _) = &*UPDATE_UI;
-                        let _ = sen.send(state.scanned_devices.write().unwrap().len());
-                    }
-                }
+    let device_regex = Regex::new(r"^.*Device ").unwrap();
+    line_buffer.lines().filter_map(Result::ok).for_each(|line| {
+        if line.contains("Device") {
+            println!("Line received");
+            let sanitized_line = sanitize_device_line(&line);
+            if line.contains("[0;93mCHG") {
+            } else if line.contains("[0;92mNEW") {
+                let device = Device::new(&sanitized_line);
+                GLOBAL.write().unwrap().devices.push(device);
+            } else if line.contains("[0;91mDEL") {
+                let device = Device::new(&sanitized_line);
+                GLOBAL
+                    .write()
+                    .unwrap()
+                    .devices
+                    .retain(|d| d.mac_addr != device.mac_addr);
             }
         }
-    }
+    });
 }
 
-pub async fn known_devices() {
-    let mut run_process = Command::new("bluetoothctl")
+fn sanitize_device_line(line: &str) -> String {
+    let regex = Regex::new(r"^.*Device ").unwrap();
+    return regex.replace(&line, "").to_string();
+}
+
+pub fn known_devices() {
+    let command = Command::new("bluetoothctl")
         .arg("devices")
-        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .spawn()
-        .expect("Bluetoothctl interactive mode wasn't initialized properly (⊙ _ ⊙ )");
+        .output()
+        .expect("Could not get devices");
 
-    let stdout = run_process
-        .stdout
-        .take()
-        .expect("Could not get output from bluetoothctl 'scan on' command pipeline (⊙ _ ⊙ )");
-
-    let stdout_reader = BufReader::new(stdout);
-
-    let devices: Vec<Device> = stdout_reader
+    let lines_buffer = BufReader::new(&command.stdout[..]);
+    let devices: Vec<Device> = lines_buffer
         .lines()
         .filter_map(Result::ok)
-        .filter_map(|line| Device::new(&line))
+        .filter_map(|line| {
+            if line.contains("Device") {
+                let sanitized_line = sanitize_device_line(&line);
+                println!("{}", sanitized_line);
+                return Some(Device::new(&sanitized_line));
+            } else {
+                None
+            }
+        })
         .collect();
 
-    GLOBAL_STATE
-        .write()
-        .unwrap()
-        .scanned_devices
-        .write()
-        .unwrap()
-        .extend(devices);
+    GLOBAL.write().unwrap().devices.extend(devices);
 }
