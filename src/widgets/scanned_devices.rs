@@ -19,7 +19,9 @@ impl ScannedDevices {
         let state = global.read().unwrap();
         let block = Block::bordered();
 
-        let entries: Vec<Text<'_>> = state.scanned_devices.iter().map(|s| s.to_text()).collect();
+        let binding = state.scanned_devices.read().unwrap();
+        let entries: Vec<Text<'_>> = binding.iter().map(|s| s.to_text()).collect();
+
         let list = List::new(entries)
             .highlight_symbol(">")
             .block(block)

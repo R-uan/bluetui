@@ -41,31 +41,39 @@ pub async fn scan_devices() {
                 let format = &line[start..line.len()];
 
                 if let Some(device) = Device::new(format) {
-                    let mut state = global_variable.write().unwrap();
-                    state.scanned_devices.push(device);
+                    let state = global_variable.write().unwrap();
+                    state.scanned_devices.write().unwrap().push(device);
                     let (sen, _) = &*UPDATE_UI;
-                    let _ = sen.send(state.scanned_devices.len());
+                    let _ = sen.send(state.scanned_devices.write().unwrap().len());
                 }
             } else if line.contains("DEL") && line.contains("Device") {
                 let start = line.find("Device").unwrap();
                 let format = &line[start..line.len()];
 
                 if let Some(device) = Device::new(format) {
-                    let mut state = global_variable.write().unwrap();
+                    let state = global_variable.write().unwrap();
                     state
                         .scanned_devices
+                        .write()
+                        .unwrap()
                         .retain(|dev| dev.mac_addr != device.mac_addr);
                 }
             } else if line.contains("CHG") && line.contains("Device") {
                 let start = line.find("Device").unwrap();
                 let format = &line[start..line.len()];
 
-                let mut state = global_variable.write().unwrap();
+                let state = global_variable.write().unwrap();
                 if let Some(mac) = Device::extract_mac(format) {
-                    if let Some(device) =
-                        state.scanned_devices.iter_mut().find(|d| d.mac_addr == mac)
+                    if let Some(index) = state
+                        .scanned_devices
+                        .write()
+                        .unwrap()
+                        .iter()
+                        .position(|d| d.mac_addr == mac)
                     {
-                        device.update_device_info();
+                        state.scanned_devices.write().unwrap()[index].update_device_info(index);
+                        let (sen, _) = &*UPDATE_UI;
+                        let _ = sen.send(state.scanned_devices.write().unwrap().len());
                     }
                 }
             }
@@ -94,5 +102,11 @@ pub async fn known_devices() {
         .filter_map(|line| Device::new(&line))
         .collect();
 
-    GLOBAL_STATE.write().unwrap().scanned_devices = devices;
+    GLOBAL_STATE
+        .write()
+        .unwrap()
+        .scanned_devices
+        .write()
+        .unwrap()
+        .extend(devices);
 }

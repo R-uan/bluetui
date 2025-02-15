@@ -1,13 +1,14 @@
 use std::{
     io::{BufRead, BufReader},
     process::{Command, Stdio},
+    sync::Arc,
 };
 
 use ratatui::text::{Text, ToText};
 
 use crate::bluetooth::controller::extract_value;
 
-use super::global_state::CONNECTED_DEVICE;
+use super::global_state::{CONNECTED_DEVICE, GLOBAL_STATE};
 
 #[derive(Default, Clone)]
 pub struct Device {
@@ -20,22 +21,26 @@ pub struct Device {
 
 impl ToText for Device {
     fn to_text(&self) -> Text<'_> {
-        let c = match self.connected {
-            Some(x) => {
-                if x == true {
-                    "c"
-                } else {
-                    ""
-                }
-            }
-            None => "",
-        };
         let value = format!("{} - {}", self.name, self.mac_addr);
         return Text::from(value);
     }
 }
 
 impl Device {
+    pub fn add_to_scanned(input: &str) {
+        if let Some(device) = Device::new(input) {
+            let connected = device.connected.unwrap();
+            let global = GLOBAL_STATE.write().unwrap();
+
+            let mut scanned_devices = global.scanned_devices.write().unwrap();
+            scanned_devices.push(device);
+
+            if connected {
+                *CONNECTED_DEVICE.write().unwrap() = Some(scanned_devices.len() - 1);
+            }
+        };
+    }
+
     pub fn new(input: &str) -> Option<Self> {
         let info: Vec<&str> = input.splitn(3, " ").collect();
         if info.len() != 3 {
@@ -73,10 +78,6 @@ impl Device {
         return Some(device);
     }
 
-    pub fn pair(&self) {
-        todo!()
-    }
-
     pub fn extract_mac(input: &str) -> Option<&str> {
         let info: Vec<&str> = input.splitn(3, " ").collect();
         if info.len() != 3 {
@@ -85,7 +86,7 @@ impl Device {
         return Some(info[1]);
     }
 
-    pub fn update_device_info(&mut self) {
+    pub fn update_device_info(&mut self, index: usize) {
         let mut run = Command::new("bluetoothctl")
             .args(&["info", &self.mac_addr])
             .stdout(Stdio::piped())
@@ -105,9 +106,7 @@ impl Device {
                     let value = extract_value(&line) == "yes";
                     self.connected = Some(value);
                     if value {
-                        let mut xd = CONNECTED_DEVICE.write().unwrap();
-                        let clon = self.clone();
-                        *xd = Some(clon);
+                        *CONNECTED_DEVICE.write().unwrap() = Some(index);
                     }
                 } else if line.contains("Alias") {
                     self.name = extract_value(&line).to_owned();

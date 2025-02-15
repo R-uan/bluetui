@@ -21,14 +21,13 @@ impl CurrentStatusWidget {
         .flex(Flex::SpaceAround)
         .split(area);
 
-        let global = Arc::clone(&GLOBAL_STATE);
-        let state = global.read().unwrap();
-        let power_status = match state.controller_info.powered {
+        let state = GLOBAL_STATE.read().unwrap();
+        let power_status = match state.controller_info.read().unwrap().powered {
             true => "power on",
             false => "power off",
         };
 
-        let power_style = match state.controller_info.powered {
+        let power_style = match state.controller_info.read().unwrap().powered {
             true => Style::new().fg(Color::LightGreen),
             false => Style::new().fg(Color::LightRed),
         };
@@ -38,16 +37,18 @@ impl CurrentStatusWidget {
             .style(power_style)
             .render(main[0], buf);
 
-        Paragraph::new(state.scanned_devices.len().to_string())
+        Paragraph::new(state.scanned_devices.read().unwrap().len().to_string())
             .alignment(Alignment::Center)
             .render(main[1], buf);
 
-        let cl = Arc::clone(&CONNECTED_DEVICE);
-        let binding = cl.read().unwrap();
-        let xdx = binding.as_ref();
+        let device = if let Some(index) = *CONNECTED_DEVICE.read().unwrap() {
+            Some(GLOBAL_STATE.read().unwrap().scanned_devices.read().unwrap()[index].clone())
+        } else {
+            None
+        };
 
-        let caralho = if let Some(_) = xdx {
-            "Connected"
+        let caralho = if let Some(d) = device {
+            &format!("Connected: {}", d.name)
         } else {
             "None"
         };
