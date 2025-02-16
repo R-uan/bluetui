@@ -1,12 +1,11 @@
-use std::{
-    thread::{self, sleep},
-    time::Duration,
-};
+use std::thread::{self};
 
 use bluetooth::devices::{known_devices, scan_devices};
-use data::global_state::GLOBAL;
+use bluetui::Bluetui;
 
 mod bluetooth;
+mod bluetui;
+mod widgets;
 
 mod data;
 #[tokio::main]
@@ -14,11 +13,9 @@ async fn main() -> Result<(), std::io::Error> {
     thread::spawn(move || known_devices());
     thread::spawn(move || scan_devices());
 
-    loop {
-        let global = GLOBAL.read().unwrap().devices.len();
-        println!("{}", global);
-        sleep(Duration::from_secs(1));
-    }
+    let mut terminal = ratatui::init();
+    let app = Bluetui::default().run(&mut terminal).await;
+    ratatui::restore();
 
-    Ok(())
+    app
 }

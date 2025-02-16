@@ -5,10 +5,7 @@ use std::{
 
 use regex::Regex;
 
-use crate::data::{
-    device::{self, Device},
-    global_state::GLOBAL,
-};
+use crate::data::{device::Device, global_state::GLOBAL};
 
 pub fn scan_devices() {
     let mut command = Command::new("bluetoothctl")
@@ -25,14 +22,14 @@ pub fn scan_devices() {
     let stdout = command.stdout.take().expect("Unable to get stdout");
     let line_buffer = BufReader::new(stdout);
 
-    let device_regex = Regex::new(r"^.*Device ").unwrap();
     line_buffer.lines().filter_map(Result::ok).for_each(|line| {
         if line.contains("Device") {
-            println!("Line received");
             let sanitized_line = sanitize_device_line(&line);
             if line.contains("[0;93mCHG") {
             } else if line.contains("[0;92mNEW") {
-                let device = Device::new(&sanitized_line);
+                let sanitized_line = sanitize_device_line(&line);
+                let mut device = Device::new(&sanitized_line);
+                device.collect_status();
                 GLOBAL.write().unwrap().devices.push(device);
             } else if line.contains("[0;91mDEL") {
                 let device = Device::new(&sanitized_line);
@@ -65,8 +62,9 @@ pub fn known_devices() {
         .filter_map(|line| {
             if line.contains("Device") {
                 let sanitized_line = sanitize_device_line(&line);
-                println!("{}", sanitized_line);
-                return Some(Device::new(&sanitized_line));
+                let mut device = Device::new(&sanitized_line);
+                device.collect_status();
+                return Some(device);
             } else {
                 None
             }
