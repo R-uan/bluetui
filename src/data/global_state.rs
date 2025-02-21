@@ -1,10 +1,19 @@
 use std::sync::{Arc, LazyLock, RwLock};
 
-use super::device::Device;
+use super::{controller::ControllerInfo, device::Device};
 
-#[derive(Default)]
 pub struct GlobalState {
+    pub controller: ControllerInfo,
     pub devices: Vec<Device>,
+}
+
+impl Default for GlobalState {
+    fn default() -> Self {
+        Self {
+            devices: Default::default(),
+            controller: ControllerInfo::init(),
+        }
+    }
 }
 
 pub static GLOBAL: LazyLock<Arc<RwLock<GlobalState>>> =

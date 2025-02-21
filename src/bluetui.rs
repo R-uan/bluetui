@@ -3,16 +3,20 @@ use std::{io::Result, time::Duration};
 use ratatui::{
     buffer::Buffer,
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
-    layout::Rect,
+    layout::{Constraint, Layout, Rect},
     widgets::Widget,
     DefaultTerminal,
 };
 
-use crate::widgets::devices_list::DevicesList;
+use crate::{
+    data::global_state::GLOBAL,
+    widgets::{devices_list::DevicesList, status_bar::StatusBar},
+};
 
 #[derive(Default)]
 pub struct Bluetui {
     pub exit: bool,
+    pub status_bar: StatusBar,
     pub device_list: DevicesList,
 }
 
@@ -39,9 +43,10 @@ impl Bluetui {
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
-            KeyCode::Char('j') | KeyCode::Down => self.next_(),
-            KeyCode::Char('k') | KeyCode::Up => {}
-            KeyCode::Char('q') | KeyCode::Esc => self.exit(),
+            KeyCode::Char('j') | KeyCode::Down => self.next_device(),
+            KeyCode::Char('k') | KeyCode::Up => self.previous_device(),
+            KeyCode::Char('q') | KeyCode::Esc => self.exit_app(),
+            KeyCode::Enter => self.select_device(),
             _ => {}
         }
     }
@@ -49,16 +54,41 @@ impl Bluetui {
 
 impl Widget for &mut Bluetui {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        self.device_list.render(area, buf);
+        let layout =
+            Layout::vertical([Constraint::Percentage(10), Constraint::Percentage(90)]).split(area);
+
+        self.status_bar.render(layout[0], buf);
+        self.device_list.render(layout[1], buf);
     }
 }
 
 impl Bluetui {
-    fn exit(&mut self) {
+    fn exit_app(&mut self) {
         self.exit = true;
     }
 
-    fn next_(&mut self) {
+    fn next_device(&mut self) {
         self.device_list.list_state.write().unwrap().select_next();
+    }
+
+    fn previous_device(&mut self) {
+        self.device_list
+            .list_state
+            .write()
+            .unwrap()
+            .select_previous();
+    }
+
+    fn select_device(&mut self) {
+        let a = self
+            .device_list
+            .list_state
+            .read()
+            .unwrap()
+            .selected()
+            .unwrap();
+
+        let xdd = GLOBAL.read().unwrap();
+        println!("{}", xdd.devices[a].mac_addr);
     }
 }

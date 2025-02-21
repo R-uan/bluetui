@@ -5,6 +5,7 @@ use bluetui::Bluetui;
 
 mod bluetooth;
 mod bluetui;
+mod utils;
 mod widgets;
 
 mod data;

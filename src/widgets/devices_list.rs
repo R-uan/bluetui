@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    widgets::{HighlightSpacing, List, ListState, StatefulWidget},
+    widgets::{Block, HighlightSpacing, List, ListState, StatefulWidget},
 };
 
 use crate::data::global_state::GLOBAL;
@@ -22,7 +22,8 @@ impl DevicesList {
 
         let list = List::new(entries)
             .highlight_symbol(".")
-            .highlight_spacing(HighlightSpacing::Always);
+            .highlight_spacing(HighlightSpacing::Always)
+            .block(Block::bordered());
 
         StatefulWidget::render(list, area, buf, &mut state);
     }

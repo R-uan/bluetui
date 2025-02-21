@@ -3,6 +3,8 @@ use std::{
     process::Command,
 };
 
+use crate::utils::extract_value;
+
 pub struct Device {
     pub name: String,
     pub mac_addr: String,
@@ -71,9 +73,4 @@ impl Device {
 
         self.status = Some(device_status);
     }
-}
-
-pub fn extract_value(input: &str) -> &str {
-    let split: Vec<&str> = input.splitn(2, ": ").collect();
-    return split[1];
 }
